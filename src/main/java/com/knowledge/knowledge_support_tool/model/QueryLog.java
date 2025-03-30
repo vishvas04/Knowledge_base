@@ -6,9 +6,6 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
-
 @Entity
 @Table(name = "query_log")
 @Getter
@@ -25,7 +22,10 @@ public class QueryLog {
     private String llmUsed;
     private Boolean success;
 
-    @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "referenced_documents", columnDefinition = "text[]")
-    private List<String> referencedDocuments;
+    @OneToMany(
+            mappedBy = "queryLog",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<ReferencedDocument> referencedDocuments;  // No array annotations
 }

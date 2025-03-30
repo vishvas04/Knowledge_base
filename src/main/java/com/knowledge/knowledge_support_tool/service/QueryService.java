@@ -2,6 +2,7 @@ package com.knowledge.knowledge_support_tool.service;
 
 import com.knowledge.knowledge_support_tool.model.Document;
 import com.knowledge.knowledge_support_tool.model.QueryLog;
+import com.knowledge.knowledge_support_tool.model.ReferencedDocument;
 import com.knowledge.knowledge_support_tool.repository.DocumentRepository;
 import com.knowledge.knowledge_support_tool.repository.QueryLogRepository;
 import org.slf4j.Logger;
@@ -62,7 +63,15 @@ public class QueryService {
 
             Object sources = result.get("sources");
             if (sources instanceof List<?>) {
-                log.setReferencedDocuments((List<String>) sources);
+                List<ReferencedDocument> refDocs = ((List<String>) sources).stream()
+                        .map(documentId -> {
+                            ReferencedDocument refDoc = new ReferencedDocument();
+                            refDoc.setDocumentId(documentId);
+                            refDoc.setQueryLog(log);  // Associate with the QueryLog
+                            return refDoc;
+                        })
+                        .toList();
+                log.setReferencedDocuments(refDocs);
             } else {
                 logger.warn("Unexpected type for 'sources' field: {}",
                         (sources != null) ? sources.getClass() : "null");

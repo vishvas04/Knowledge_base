@@ -1,5 +1,6 @@
 package com.knowledge.knowledge_support_tool.controller;
 
+import com.knowledge.knowledge_support_tool.dto.QueryRequest;
 import com.knowledge.knowledge_support_tool.service.QueryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,8 +19,8 @@ public class QueryController {
     private QueryService queryService;
 
     @PostMapping
-    public ResponseEntity<String> processQuery(@RequestBody Map<String, String> request) {
-        String response = queryService.processQuery(request.get("question"));
+    public ResponseEntity<String> processQuery(@RequestBody QueryRequest request) {
+        String response = queryService.processQuery(request.getQuestion());
         return ResponseEntity.ok(response);
     }
 }
