@@ -4,6 +4,8 @@ import com.knowledge.knowledge_support_tool.model.Document;
 import com.knowledge.knowledge_support_tool.model.QueryLog;
 import com.knowledge.knowledge_support_tool.repository.DocumentRepository;
 import com.knowledge.knowledge_support_tool.repository.QueryLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class QueryService {
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private static final Logger logger = LoggerFactory.getLogger(QueryService.class);
 
     @Autowired
     private QueryLogRepository queryLogRepository;
@@ -34,49 +37,6 @@ public class QueryService {
     private String pythonServiceUrl;
     @Value("${file.storage.path}")
     private String fileStoragePath;
-
-//    public String processDocument(MultipartFile file) throws IOException {
-//        // Save document locally first
-//        Document doc = saveLocalDocument(file);
-//
-//        // Send to Python processing
-//        HttpHeaders headers = new HttpHeaders();
-//        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-//
-//        LinkedMultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-//        body.add("file", new ByteArrayResource(file.getBytes()) {
-//            @Override
-//            public String getFilename() {
-//                return file.getOriginalFilename();
-//            }
-//        });
-//
-//        String response = restTemplate.postForObject(
-//                pythonServiceUrl + "/process-document",
-//                new HttpEntity<>(body, headers),
-//                String.class
-//        );
-//
-//        if (!"processed".equals(response)) {
-//            throw new DocumentProcessingException("Failed to process document");
-//        }
-//
-//        return doc.getId().toString();
-//    }
-//
-//    private Document saveLocalDocument(MultipartFile file) throws IOException {
-//        Document doc = new Document();
-//        doc.setTitle(file.getOriginalFilename());
-//        doc.setFileType(file.getContentType());
-//        doc.setFilePath(fileStoragePath + "/" + file.getOriginalFilename());
-//        doc.setUploadDate(LocalDateTime.now());
-//
-//        // Save file to filesystem
-//        file.transferTo(new java.io.File(doc.getFilePath()));
-//
-//        return documentRepository.save(doc);
-//    }
-
     public String processQuery(String question) {
         long startTime = System.currentTimeMillis();
         QueryLog log = new QueryLog();
@@ -84,11 +44,6 @@ public class QueryService {
         log.setTimestamp(LocalDateTime.now());
 
         try {
-//            Map<String, String> request = Map.of("question", question);
-//            Map<String, Object> result = restTemplate.getForObject(
-//                    pythonServiceUrl + "/answer?question=" + question,
-//                    Map.class
-//            );
             Map<String, String> request = Map.of("question", question);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -104,7 +59,14 @@ public class QueryService {
             log.setResponseTime((System.currentTimeMillis() - startTime) / 1000.0);
             log.setLlmUsed(result.get("llm_used").toString());
             log.setSuccess(true);
-            log.setReferencedDocuments((List<String>) result.get("sources"));
+
+            Object sources = result.get("sources");
+            if (sources instanceof List<?>) {
+                log.setReferencedDocuments((List<String>) sources);
+            } else {
+                logger.warn("Unexpected type for 'sources' field: {}",
+                        (sources != null) ? sources.getClass() : "null");
+            }
 
             return result.get("answer").toString();
         } catch (Exception e) {
@@ -114,13 +76,6 @@ public class QueryService {
             queryLogRepository.save(log);
         }
     }
-
-//    // Custom Exceptions
-//    public static class DocumentProcessingException extends RuntimeException {
-//        public DocumentProcessingException(String message) {
-//            super(message);
-//        }
-//    }
 
     public static class QueryProcessingException extends RuntimeException {
         public QueryProcessingException(String message) {

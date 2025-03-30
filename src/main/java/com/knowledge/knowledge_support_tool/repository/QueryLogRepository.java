@@ -3,7 +3,9 @@ package com.knowledge.knowledge_support_tool.repository;
 import com.knowledge.knowledge_support_tool.model.QueryLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface QueryLogRepository extends JpaRepository<QueryLog, Long> {
@@ -19,11 +21,22 @@ public interface QueryLogRepository extends JpaRepository<QueryLog, Long> {
     Double findSuccessRate();
 
     @Query(value = """
-            SELECT referenced_documents, COUNT(*) as count 
-            FROM query_log 
-            GROUP BY referenced_documents 
-            ORDER BY count DESC 
-            LIMIT 5
-            """, nativeQuery = true)
+    SELECT DATE_TRUNC('day', timestamp) AS day, COUNT(*) 
+    FROM query_log 
+    WHERE timestamp BETWEEN :start AND :end 
+    GROUP BY day""",
+            nativeQuery = true)
+    List<Object[]> countQueriesPerDay(@Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    @Query(value = """
+    SELECT unnested_doc, COUNT(*) as count 
+    FROM (
+        SELECT UNNEST(referenced_documents) AS unnested_doc 
+        FROM query_log
+    ) AS subquery 
+    GROUP BY unnested_doc 
+    ORDER BY count DESC 
+    LIMIT 5
+    """, nativeQuery = true)
     List<Object[]> findTopReferencedDocuments();
 }
