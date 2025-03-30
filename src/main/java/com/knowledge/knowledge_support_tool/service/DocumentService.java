@@ -1,5 +1,6 @@
 package com.knowledge.knowledge_support_tool.service;
 
+import com.knowledge.knowledge_support_tool.controller.FileStorageException;
 import com.knowledge.knowledge_support_tool.model.Document;
 import com.knowledge.knowledge_support_tool.repository.DocumentRepository;
 import org.apache.commons.io.FilenameUtils;
@@ -48,6 +49,14 @@ public class DocumentService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     public Document saveDocument(MultipartFile file) throws IOException {
+        if (!file.getContentType().equals("application/pdf")) {
+            throw new FileStorageException("Only PDF files are allowed");
+        }
+
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new FileStorageException("File size exceeds 10MB");
+        }
+
         try {
             validateFile(file);
 

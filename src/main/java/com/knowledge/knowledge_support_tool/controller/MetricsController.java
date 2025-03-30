@@ -22,9 +22,13 @@ public class MetricsController {
 
     @GetMapping("/daily")
     public ResponseEntity<Map<String, Object>> getDailyMetrics(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
-        return ResponseEntity.ok(metricsService.getDailyMetrics(start, end)); // Pass dates to service
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end) {
+
+        if (start == null) start = LocalDate.of(1970, 1, 1);
+        if (end == null) end = LocalDate.now();
+
+        return ResponseEntity.ok(metricsService.getDailyMetrics(start, end));
     }
 
     @GetMapping("/documents/top")

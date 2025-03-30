@@ -23,15 +23,19 @@ public class MetricsService {
         return metrics;
     }
 
+    public Map<String, Object> getDailyMetrics() {
+        return getDailyMetrics(LocalDate.MIN, LocalDate.MAX); // Default to all time
+    }
+
     public List<Object[]> getMostQueriedDocuments() {
         return queryLogRepository.findTopReferencedDocuments();
     }
 
     public Map<String, Double> getPerformanceStatistics() {
-        Map<String, Object> dailyMetrics = this.getDailyMetrics(null, null);
+        Map<String, Object> dailyMetrics = this.getDailyMetrics();
         return Map.of(
-                "averageResponseTime", (Double) dailyMetrics.get("averageResponseTime"),
-                "successRate", (Double) dailyMetrics.get("successRate")
+                "averageResponseTime", queryLogRepository.findAverageResponseTime(),
+                "successRate", queryLogRepository.findSuccessRate()
         );
     }
 

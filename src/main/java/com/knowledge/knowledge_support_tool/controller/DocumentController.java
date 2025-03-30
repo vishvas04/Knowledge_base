@@ -20,10 +20,11 @@ public class DocumentController {
     public ResponseEntity<String> uploadDocument(@RequestParam("file") MultipartFile file) {
         try {
             documentService.saveDocument(file);
-            return ResponseEntity.ok("Document uploaded and saved successfully.");
+            return ResponseEntity.ok("Document uploaded successfully");
+        } catch (FileStorageException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());  // 400 Bad Request
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body("Document processing failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body("Server error: " + e.getMessage());
         }
     }
 }

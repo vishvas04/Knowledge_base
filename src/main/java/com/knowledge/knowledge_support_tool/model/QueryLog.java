@@ -20,6 +20,7 @@ public class QueryLog {
     private LocalDateTime timestamp;
     private Double responseTime;
     private String llmUsed;
+    @Column(name = "success")
     private Boolean success;
 
     @OneToMany(

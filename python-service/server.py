@@ -2,6 +2,9 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from pathlib import Path
 import os
 import uuid
+import certifi
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 
 from pydantic import BaseModel
 from langchain.chains.retrieval_qa.base import RetrievalQA
@@ -16,6 +19,9 @@ load_dotenv()
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 assert gemini_api_key, "GEMINI_API_KEY is missing!"
 
+os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
+os.environ["SSL_CERT_FILE"] = certifi.where()
+
 app = FastAPI()
 
 UPLOAD_DIR = Path("/Users/vishvasdevarasetty/uploads")
@@ -24,7 +30,9 @@ UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 # Initialize embeddings correctly
 embeddings = GoogleGenerativeAIEmbeddings(
     model="models/embedding-001",
-    api_key=gemini_api_key
+    api_key=gemini_api_key,
+    request_timeout=300,
+    task_type="retrieval_document"
 )
 
 vector_store = None  # Global vector store
@@ -58,8 +66,10 @@ async def process_document(file: UploadFile = File(...)):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to load document: {str(e)}")
 
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
         splits = text_splitter.split_documents(docs)
+        for i, split in enumerate(splits):
+            split.metadata["chunk_id"] = i
 
         global vector_store
         vector_store = FAISS.from_documents(splits, embeddings)
@@ -101,3 +111,7 @@ async def answer_question(request: QuestionRequest):
         "sources": sources,
         "llm_used": "gemini"
     }
+
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=2, min=5, max=20))
+def process_with_retry(text):
+    return embeddings.embed_documents([text])

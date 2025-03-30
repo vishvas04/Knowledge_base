@@ -64,10 +64,10 @@ public class QueryService {
             Object sources = result.get("sources");
             if (sources instanceof List<?>) {
                 List<ReferencedDocument> refDocs = ((List<String>) sources).stream()
-                        .map(documentId -> {
+                        .map(documentIdStr -> {
                             ReferencedDocument refDoc = new ReferencedDocument();
-                            refDoc.setDocumentId(documentId);
-                            refDoc.setQueryLog(log);  // Associate with the QueryLog
+                            refDoc.setDocumentId(Long.parseLong(documentIdStr)); // Parse to Long
+                            refDoc.setQueryLog(log);
                             return refDoc;
                         })
                         .toList();
