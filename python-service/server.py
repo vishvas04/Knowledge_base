@@ -1,11 +1,9 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from pathlib import Path
 import os
 import uuid
 import certifi
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-
 from pydantic import BaseModel
 from langchain.chains.retrieval_qa.base import RetrievalQA
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
@@ -27,7 +25,6 @@ app = FastAPI()
 UPLOAD_DIR = Path("/Users/vishvasdevarasetty/uploads")
 UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 
-# Initialize embeddings correctly
 embeddings = GoogleGenerativeAIEmbeddings(
     model="models/embedding-001",
     api_key=gemini_api_key,
@@ -35,7 +32,7 @@ embeddings = GoogleGenerativeAIEmbeddings(
     task_type="retrieval_document"
 )
 
-vector_store = None  # Global vector store
+vector_store = None
 
 def get_loader(file_path: str, file_name: str):
     if file_name.endswith(".pdf"):
@@ -48,7 +45,7 @@ def get_loader(file_path: str, file_name: str):
         raise HTTPException(status_code=400, detail=f"Unsupported file format: {file_name}")
 
 @app.post("/process-document")
-async def process_document(file: UploadFile = File(...)):
+async def process_document(file: UploadFile = File(...), doc_id: str = Form(...)):
     try:
         safe_filename = f"{uuid.uuid4().hex}_{file.filename}"
         file_path = UPLOAD_DIR / safe_filename
@@ -57,24 +54,22 @@ async def process_document(file: UploadFile = File(...)):
         with open(file_path, "wb") as f:
             f.write(content)
 
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=500, detail=f"File was not saved: {file_path}")
-
-        try:
-            loader = get_loader(str(file_path), file.filename)
-            docs = loader.load()
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to load document: {str(e)}")
-
+        loader = get_loader(str(file_path), file.filename)
+        docs = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
         splits = text_splitter.split_documents(docs)
-        for i, split in enumerate(splits):
-            split.metadata["chunk_id"] = i
+
+        for split in splits:
+            split.metadata["doc_id"] = doc_id
+            split.metadata["source"] = str(file_path)
 
         global vector_store
-        vector_store = FAISS.from_documents(splits, embeddings)
+        if vector_store is None:
+            vector_store = FAISS.from_documents(splits, embeddings)
+        else:
+            vector_store.add_documents(splits)
 
-        return {"status": "processed", "file": file.filename}
+        return {"status": "processed", "doc_id": doc_id}
 
     except Exception as e:
         return {"error": str(e)}
@@ -88,22 +83,17 @@ async def answer_question(request: QuestionRequest):
     global vector_store
 
     if not vector_store:
-        raise HTTPException(status_code=400, detail="No documents have been processed yet.")
+        raise HTTPException(status_code=400, detail="No documents processed")
 
     docs = vector_store.similarity_search(question, k=3)
-    sources = [doc.metadata.get("source", "unknown") for doc in docs]
+    sources = [str(doc.metadata["doc_id"]) for doc in docs]
 
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro-latest",
-        api_key=gemini_api_key
-    )
-
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", api_key=gemini_api_key)
     chain = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=vector_store.as_retriever(),
         return_source_documents=True
     )
-
     result = chain({"query": question})
 
     return {

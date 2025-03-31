@@ -130,7 +130,7 @@ public class DocumentService {
         try {
             validateFileExists(targetPath);
 
-            HttpEntity<MultiValueMap<String, Object>> requestEntity = createRequestEntity(targetPath);
+            HttpEntity<MultiValueMap<String, Object>> requestEntity = createRequestEntity(targetPath, savedDoc.getId());
             ResponseEntity<String> response = restTemplate.postForEntity(
                     pythonServiceUrl + "/process-document",
                     requestEntity,
@@ -145,27 +145,23 @@ public class DocumentService {
         }
     }
 
-    private void validateFileExists(Path targetPath) throws IOException {
-        if (!Files.exists(targetPath)) {
-            logger.error("File does not exist at path: {}", targetPath);
-            throw new IOException("Missing file for processing");
-        }
-    }
-
-    private HttpEntity<MultiValueMap<String, Object>> createRequestEntity(Path targetPath) {
+    private HttpEntity<MultiValueMap<String, Object>> createRequestEntity(Path targetPath, Long docId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         FileSystemResource fileResource = new FileSystemResource(targetPath.toFile());
-
-        if (!fileResource.exists()) {
-            logger.error("FileSystemResource could not find file: {}", targetPath);
-            throw new IllegalArgumentException("File resource not found");
-        }
-
         body.add("file", fileResource);
+        body.add("doc_id", docId.toString());
+
         return new HttpEntity<>(body, headers);
+    }
+
+    private void validateFileExists(Path targetPath) throws IOException {
+        if (!Files.exists(targetPath)) {
+            logger.error("File does not exist at path: {}", targetPath);
+            throw new IOException("Missing file for processing");
+        }
     }
 
     private void logPythonServiceResponse(ResponseEntity<String> response, Document savedDoc) {
