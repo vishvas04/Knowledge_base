@@ -15,7 +15,7 @@ public class MultipartConfig {
     @Bean
     public MultipartConfigElement multipartConfigElement() {
         MultipartConfigFactory factory = new MultipartConfigFactory();
-        factory.setLocation(uploadPath);  // Store temp files here too
+        factory.setLocation(uploadPath);
         return factory.createMultipartConfig();
     }
 }
