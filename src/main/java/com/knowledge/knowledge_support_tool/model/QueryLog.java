@@ -20,6 +20,7 @@ public class QueryLog {
     private LocalDateTime timestamp;
     private Double responseTime;
     private String llmUsed;
+
     @Column(name = "success")
     private Boolean success;
 
@@ -28,5 +29,5 @@ public class QueryLog {
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    private List<ReferencedDocument> referencedDocuments;  // No array annotations
+    private List<ReferencedDocument> referencedDocuments;
 }

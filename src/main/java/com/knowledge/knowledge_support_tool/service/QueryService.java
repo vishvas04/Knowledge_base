@@ -53,9 +53,9 @@ public class QueryService {
 
             List<String> sources = (List<String>) result.get("sources");
             List<ReferencedDocument> refDocs = sources.stream()
-                    .map(documentId -> {
+                    .map(documentIdStr -> {
                         ReferencedDocument refDoc = new ReferencedDocument();
-                        refDoc.setDocumentId(Long.parseLong(documentId));
+                        refDoc.setDocumentId(Long.parseLong(documentIdStr));  // Now safe
                         refDoc.setQueryLog(log);
                         return refDoc;
                     })

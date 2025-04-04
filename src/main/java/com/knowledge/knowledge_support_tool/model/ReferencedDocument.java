@@ -12,7 +12,7 @@ public class ReferencedDocument {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long documentId;  // Field is declared as Long
+    private Long documentId;
 
     @ManyToOne
     @JoinColumn(name = "query_log_id")

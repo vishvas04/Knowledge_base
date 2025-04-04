@@ -10,6 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2t
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -56,12 +57,22 @@ async def process_document(file: UploadFile = File(...), doc_id: str = Form(...)
 
         loader = get_loader(str(file_path), file.filename)
         docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+
+        # Configure text splitter with larger chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
         splits = text_splitter.split_documents(docs)
 
-        for split in splits:
-            split.metadata["doc_id"] = doc_id
-            split.metadata["source"] = str(file_path)
+        # Add metadata with chunk IDs
+        for i, split in enumerate(splits):
+            split.metadata.update({
+                "doc_id": doc_id,
+                "source": str(file_path),
+                "chunk_id": i + 1,  # 1-based indexing
+                # "doc_title": file.filename
+            })
 
         global vector_store
         if vector_store is None:
@@ -85,19 +96,43 @@ async def answer_question(request: QuestionRequest):
     if not vector_store:
         raise HTTPException(status_code=400, detail="No documents processed")
 
-    docs = vector_store.similarity_search(question, k=3)
+    docs = vector_store.similarity_search(question, k=5)
+
     sources = [str(doc.metadata["doc_id"]) for doc in docs]
 
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", api_key=gemini_api_key)
+    custom_prompt = PromptTemplate(
+        template="""Answer the question strictly based on the given context. 
+        If the answer isn't in the context, say "I don't know".
+
+        Context: {context}
+        Question: {question}
+        Answer:""",
+        input_variables=["context", "question"]
+    )
+
+    # Configure Gemini with lower creativity
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-pro-latest",
+        api_key=gemini_api_key,
+        temperature=0.3
+    )
+
+    # Create retrieval chain with custom prompt
     chain = RetrievalQA.from_chain_type(
         llm=llm,
         retriever=vector_store.as_retriever(),
-        return_source_documents=True
+        return_source_documents=True,
+        chain_type_kwargs={"prompt": custom_prompt}
     )
-    result = chain({"query": question})
+
+    result = chain.invoke({"query": question})
+
+    answer = result["result"].strip()
+    if "don't know" in answer.lower():
+        answer = "I couldn't find a clear answer in the provided documents."
 
     return {
-        "answer": result["result"],
+        "answer": answer,
         "sources": sources,
         "llm_used": "gemini"
     }
